@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<body>
+    <canvas id="graph"></canvas>
+    <div>
+        <button id="addTime">Add Time</button>
+    </div>
+    <div id="sliderContainer">
+        <div class="slider"></div>
+    </div>
+    <div id="timeContainer"></div>
+    <div id="colorSliders"></div>
+    <button id="send">Send</button>
+    <div id="inputContainer">
+        <input type="date" id="dateInput">
+        <input type="number" value="Phosphate" id="phosInput">
+        <input type="number" value="Nitrate" id="nitInput">
+        <input type="number" value="Phosphate Dose" id="phosDoseInput">
+        <input type="number" value="Nitrate Dose" id="nitDoseInput">
+        <input type="number" value="Potassium Dose" id="potDose">
+        <input type="number" value="Water Change" id="waterChangeInput">
+    </div>
+</body>
+
+<script>
+    const colors = ["Red", "Blue", "Cold White", "Pure White", "Warm White"];
+    let index = 0;
+    let graphElement = document.getElementById("graph");
+    let canvas = graphElement.getContext("2d");
+
+    function pointClicked(i) {
+        for(let j = 0; j < colorSliderContainer.children.length; j++) {
+            if(j != i) {
+                colorSliderContainer.children[j].style.display = "none";
+            } else {
+                colorSliderContainer.children[j].style.display = "block";
+            }
+        }
+    }
+
+    function createSlider(name, min, max, value, parent, update, index) {
+        let div = document.createElement("tr");
+        let desc = document.createElement("td");
+        let sliderContainer = document.createElement("td");
+        let slider = document.createElement("input");
+        let v = document.createElement("td");
+
+        desc.innerText = name;
+        slider.type = "range";
+        slider.min = min;
+        slider.max = max;
+        let d = value;
+        slider.value = d;
+        v.innerText = d;
+
+        slider.oninput = () => {
+            v.innerText = slider.value;
+            update(parseInt(slider.value), index);
+        };
+        
+        div.appendChild(desc);
+        sliderContainer.appendChild(slider);
+        sliderContainer.classList.add("inputs");
+        div.appendChild(sliderContainer);
+        div.appendChild(v);
+        parent.appendChild(div);
+    }
+
+    class timePoint {
+        constructor(time, color = [0, 0, 0, 0, 0]) { //red, blue, cwhite, pwhite, wwhite
+            this.time = time;
+            this.color = color; 
+        }
+
+        updateColor(value, index) {
+            this.color[index] = value;
+            s.update();
+        }
+
+        updateTime(time) {
+            this.time = time;
+        }
+
+        getDayTime() {
+            let hours = Math.floor(this.time / 60);
+            let mins = Math.round(this.time % 60);
+            return [hours, mins]
+        }
+    }
+
+    class schedule {
+        constructor() {
+            this.timePoints = [];
+            this.timePointsSorted = [];
+
+            this.requestSave()
+            this.loading = true;
+        }
+
+        async requestSave() {
+            const response = await fetch("/save", {
+                method: "GET"
+            })
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`)
+            } 
+            let body = await response.text();
+            let save = JSON.parse(body).save;
+            for(let i = 0; i < save.length; i++) {
+                let point = save[i];
+                createPoint(point.time, point.color);
+            }
+            this.loading = false;
+        }
+
+        addPoint(time, color = [0, 0, 0, 0, 0]) {
+            let p = new timePoint(time, color);
+            this.timePoints.push(p);
+            let min = 0;
+            let max = 100;
+            let newPointContainer = document.createElement("table");
+            for(let i = 0; i < colors.length; i++) {
+                createSlider(colors[i], min, max, color[i], newPointContainer, p.updateColor.bind(p), i);
+            }
+            colorSliderContainer.appendChild(newPointContainer);
+            pointClicked(colorSliderContainer.length - 1);
+            this.update();
+        }
+
+        remPoint(index) {
+            this.timePoints.splice(index);
+            this.update();
+        }
+
+        sort() {
+            this.timePointsSorted = this.timePoints.concat([]);
+            this.timePointsSorted.sort((a, b) => (b.time > a.time) ? -1 : 1);
+        }
+
+        graph() {
+            let height = graphElement.height;
+            let width = graphElement.width;
+
+            canvas.clearRect(0, 0, width, height);
+
+            canvas.lineWidth = "1px";
+            canvas.strokeStyle = "rgb(0, 0, 0)"
+            canvas.beginPath();
+            canvas.moveTo(0, 0);
+            canvas.lineTo(0, height);
+            canvas.lineTo(width, height);
+
+            for(let i = 0; i < 4; i++) {
+                canvas.moveTo(0, height/4 * i + height/4);
+                canvas.lineTo(width, height/4 * i + height/4);
+            }
+            let thickness = 10;
+            for(let i = 0; i < 13; i++) {
+                canvas.moveTo(width/12 * i, height);
+                canvas.lineTo(width/12 * i, height - thickness)
+            }
+            canvas.stroke();
+
+            let graphColors = ["rgb(255,25,25)", "rgb(51,51,255)", "rgb(176,215,255)", "rgb(239,247,192)", "rgb(255,234,128)"];
+            for(let c = 0; c < graphColors.length; c++) {
+                canvas.beginPath();
+                canvas.strokeStyle = graphColors[c];
+                for(let i = 0; i < this.timePointsSorted.length; i++) {
+                    let point = this.timePointsSorted[i];
+                    if(i === 0) {
+                        canvas.moveTo(0, height);
+                    }
+                    let x = point.time / 1440 * width;
+                    let y = (1 - point.color[c] / 100) * height;
+                    canvas.lineTo(x, y);
+                    canvas.ellipse(x, y, 1.5, 1.5, 0, 0, 2 * Math.PI);
+                }
+                canvas.lineTo(width, height);
+                canvas.stroke();
+            }
+        }
+
+        update() {
+            this.updateCanvas();
+            this.sort();
+            this.graph();
+            // this.sendColors();
+        }
+
+        updateCanvas() {
+            graphElement.width = window.innerWidth * 0.8;
+            graphElement.height = 200;
+            this.graph();
+
+            let c = document.getElementById("sliderContainer");
+            let tc = document.getElementById("timeContainer");
+            for(let i = 0; i < this.timePoints.length; i++) { //i = 0 is slider itself
+                let p = c.children[i + 1];
+                let prop = this.timePoints[i].time / 1440;
+                let offset = (c.clientWidth - p.clientWidth) * prop;
+                p.style.left = offset + "px";
+
+                let container = tc.children[i];
+                let dayTime = this.timePoints[i].getDayTime();
+                container.innerText = dayTime[0] + ":" + dayTime[1];
+                container.style.left = c.clientWidth * prop - container.clientWidth/2 + "px";
+            }
+        }
+
+        async sendColors() {
+            let colorArr = this.timePointsSorted.map((point) => { 
+                return {
+                    time: point.time,
+                    color: point.color
+                }
+             });
+
+            const response = await fetch("/timePoints", {
+                method: "PUT",
+                body: JSON.stringify(colorArr),
+                headers: {
+                "Content-Type": "application/json"
+                }
+            })
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`)
+            }
+        }
+    }
+
+    function createPoint(time, color = [0, 0, 0, 0, 0]) {
+        let i = index;
+        let c = document.getElementById("sliderContainer");
+        let timeContainer = document.getElementById("timeContainer");
+        let container = document.createElement("div");
+        let p = document.createElement("div");
+        p.classList.add("slidePoint");
+        container.classList.add("time");
+
+        p.onmousedown = dragStart;
+        p.onclick = () => pointClicked(i);
+        c.appendChild(p);
+        timeContainer.appendChild(container);
+
+        s.addPoint(time, color);
+
+        let dayTime = s.timePoints[i].getDayTime();
+        container.innerText = dayTime[0] + ":" + dayTime[1];
+
+        function dragStart(e) {
+            e = e || window.event;
+            e.preventDefault();
+            
+            document.onmouseup = dragEnd;
+            document.onmousemove = drag;
+        }
+
+        function drag(e) {
+            e = e || window.event;
+            e.preventDefault();
+            let position = e.clientX - c.offsetLeft;
+
+            if(position > c.clientWidth - p.clientWidth) {
+                position = c.clientWidth - p.clientWidth;
+            } else if (position < 0) {
+                position = 0;
+            }
+            p.style.left = position + "px";
+
+            let prop = position / (c.clientWidth - p.clientWidth);
+            s.timePoints[i].time = prop * 1440; //1440 = number of mins in day
+            let dayTime = s.timePoints[i].getDayTime();
+            container.innerText = dayTime[0] + ":" + dayTime[1];
+
+            container.style.left = c.clientWidth*prop - container.clientWidth/2 + "px";
+            s.update();
+        }
+
+        function dragEnd(e) {
+            document.onmouseup = null;
+            document.onmousemove = null;
+            pointClicked(i);
+        }
+        index++;
+    }
+
+    let body = document.getElementsByTagName("body")[0];
+    let sliderContainer = document.getElementById("sliderContainer");
+    let colorSliderContainer = document.getElementById("colorSliders");
+    let button = document.getElementById("addTime");
+    let sendButton = document.getElementById("send");
+    let s = new schedule();
+    sendButton.onclick = () => { if(!s.loading) s.sendColors() }
+    button.onclick = () => { if(!s.loading) createPoint(0) };
+
+    window.addEventListener("resize", s.updateCanvas.bind(s), true);
+</script>
+
+<style>
+    #graph {
+        position: fixed;
+        top: 30px;
+        left: 10%;
+        background-color: #515151;
+    }
+
+    #timeContainer {
+        position: absolute;
+        top: 280px;
+        left: 10%;
+        width: 80%;
+    }
+
+    .time {
+        white-space: nowrap;
+        position: absolute;
+    }
+
+    .slider {
+        position: relative;
+        height: 5px;
+        width: 100%;
+        border-radius: 2.5px;
+        background-color: #888;
+        top: 10px;
+    }
+
+    #sliderContainer {
+        position: absolute;
+        top: 260px;
+        left: 10%;
+        width: 80%;
+    }
+
+    .slidePoint {
+        position: absolute;
+        height: 15px;
+        width: 15px;
+        border-radius: 7.5px;
+        background-color: rgb(44, 153, 255);
+    }
+    .slidePoint:hover {
+        background-color: rgb(33, 110, 183);
+    }
+
+    #colorSliders {
+        position: absolute;
+        top: 335px;
+        left: 10%;
+        width: 80%;
+    }
+
+    input {
+        width: 95%;
+    }
+
+    .inputs {
+        width: 100%;
+        text-align: center;
+    }
+
+    table {
+        width: 100%;
+        white-space: nowrap;
+    }
+
+    #addTime {
+        position: absolute;
+        top: 300px;
+        left: 10%;
+    }
+
+    #send {
+        position: absolute;
+        right: 10%;
+        top: 300px;
+    }
+
+    #inputContainer {
+        position: absolute;
+        top: 500px;
+    }
+</style>
