@@ -2,3 +2,4 @@ decompiled.zip
 decompiled/
 .vscode/
 *.code-workspace
+__pycache__/
