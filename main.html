@@ -302,22 +302,22 @@
         let phosInput = document.getElementById("phosInput").valueAsNumber;
         let nitrateInput = document.getElementById("nitInput").valueAsNumber;
 
-        if(phosDoseInput === NaN) {
+        if(isNaN(phosDoseInput)) {
             phosDoseInput = 0;
         }
-        if(nitrateDoseInput === NaN) {
+        if(isNaN(nitrateDoseInput)) {
             nitrateDoseInput = 0;
         }
-        if(potassiumDoseInput === NaN) {
+        if(isNaN(potassiumDoseInput)) {
             potassiumDoseInput = 0;
         }
-        if(phosInput === NaN) {
+        if(isNaN(phosInput)) {
             phosInput = -1;
         }
-        if(nitrateInput === NaN) {
+        if(isNaN(nitrateInput)) {
             nitrateInput = -1;
         }
-        if(waterChangeInput === NaN) {
+        if(isNaN(waterChangeInput)) {
             waterChangeInput = 0;
         }
 
