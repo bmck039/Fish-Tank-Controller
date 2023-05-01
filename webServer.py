@@ -43,7 +43,7 @@ class Server(BaseHTTPRequestHandler):
     string = ''.join(map(chr, byte))
     if self.path == "/waterParams":
       #add data point to file
-      saveFile = open("data.csv", "w")
+      saveFile = open("data.csv", "a")
       saveFile.write("\n")
       values = json.loads(string)
       doseValues = [values[0], values[1], values[2], values[3], values[4], values[5], sizeOfTank, values[5]]
