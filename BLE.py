@@ -1,16 +1,8 @@
-import asyncio
 import sys
-import time
 from bleak import BleakScanner
 from bleak import BleakClient
-import json
-import threading
-
-from http.server import BaseHTTPRequestHandler, HTTPServer
 
 
-hostName = "localhost"
-port = 8080
 # def hexToBin(hex):
 
 def ble_encode(b):
@@ -137,54 +129,3 @@ async def sendSchedule(schedule):
 
             finally:
                 await BLEDevice.disconnect()
-
-def send(timeObjects):
-  asyncio.run(sendSchedule(timeObjects))
-  # await sendSchedule(timeObjects)
-  # time.sleep(5)
-
-class Server(BaseHTTPRequestHandler):
-  def do_GET(self):
-    self.send_response(200)
-    if self.path == "/":
-      file = open("main.html", "r").read()
-      self.send_header("Content-type", "text/html")
-      self.end_headers()
-      self.wfile.write(bytes(file, "utf-8"))
-    if self.path == "/save":
-      self.send_header("Content-type", "application/json")
-      self.end_headers()
-      save = open("save.json").read()
-      self.wfile.write(bytes(save, "utf-8"))
-
-  def do_PUT(self):
-    self.send_response(200)
-    self.end_headers()
-    contentLen = int(self.headers['content-length'])
-    byte = self.rfile.read(contentLen)
-    string = ''.join(map(chr, byte))
-    if self.path == "waterParams":
-      #add data point to file
-      #run FiahTankAITrain.py and send results to user
-      pass
-    else:
-      timeObjects = json.loads(string)
-      save = open("save.json", "w")
-      save.write("{ \"save\": " + string + "}")
-      save.close()
-
-    # threading.Thread(target=send, args=(timeObjects,)).start()
-    # send(timeObjects)
-    # asyncio.run(sendSchedule(timeObjects)) # send to light over BLE
-
-
-if __name__ == "__main__":
-    webServer = HTTPServer((hostName, port), Server)
-    print("Server started http://%s:%s" % (hostName, port))
-
-    try:
-        webServer.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    
-    webServer.server_close()
