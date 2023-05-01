@@ -9,16 +9,17 @@
     </div>
     <div id="timeContainer"></div>
     <div id="colorSliders"></div>
-    <button id="send">Send</button>
+    <button id="send">Send Schedule</button>
     <div id="inputContainer">
-        <input type="date" id="dateInput">
-        <input type="number" value="Phosphate" id="phosInput">
-        <input type="number" value="Nitrate" id="nitInput">
-        <input type="number" value="Phosphate Dose" id="phosDoseInput">
-        <input type="number" value="Nitrate Dose" id="nitDoseInput">
-        <input type="number" value="Potassium Dose" id="potDose">
-        <input type="number" value="Water Change" id="waterChangeInput">
+        <div><span>Date: </span><input type="date" id="dateInput"></div>
+        <div><span>Phosphate: </span><input type="number" id="phosInput"></div>
+        <div><span>Nitrate: </span><input type="number" id="nitInput"></div>
+        <div><span>Phosphate Dose: </span><input type="number" id="phosDoseInput"></div>
+        <div><span>Nitrate Dose: </span><input type="number" id="nitDoseInput"></div>
+        <div><span>Potassium Dose: </span><input type="number" id="potDose"></div>
+        <div><span>Water Change (Gallons): </span><input type="number" id="waterChangeInput"></div>
     </div>
+    <button id="doseSend">Send Test Values</button>
 </body>
 
 <script>
@@ -219,7 +220,7 @@
                 method: "PUT",
                 body: JSON.stringify(colorArr),
                 headers: {
-                "Content-Type": "application/json"
+                    "Content-Type": "application/json"
                 }
             })
 
@@ -285,14 +286,66 @@
         index++;
     }
 
+    function formatDate(date) {
+        if(!date) date = new Date();
+        return date.getMonth() + 1 + "/" + date.getDate() + "/" + date.getFullYear();
+    }
+
+    async function sendDose() {
+        let paramsArr = [];
+        let date = document.getElementById("dateInput").valueAsDate;
+        date = formatDate(date);
+        let waterChangeInput = document.getElementById("waterChangeInput").valueAsNumber;
+        let phosDoseInput = document.getElementById("phosDoseInput").valueAsNumber;
+        let nitrateDoseInput = document.getElementById("nitDoseInput").valueAsNumber;
+        let potassiumDoseInput = document.getElementById("potDose").valueAsNumber;
+        let phosInput = document.getElementById("phosInput").valueAsNumber;
+        let nitrateInput = document.getElementById("nitInput").valueAsNumber;
+
+        if(phosDoseInput === NaN) {
+            phosDoseInput = 0;
+        }
+        if(nitrateDoseInput === NaN) {
+            nitrateDoseInput = 0;
+        }
+        if(potassiumDoseInput === NaN) {
+            potassiumDoseInput = 0;
+        }
+        if(phosInput === NaN) {
+            phosInput = -1;
+        }
+        if(nitrateInput === NaN) {
+            nitrateInput = -1;
+        }
+        if(waterChangeInput === NaN) {
+            waterChangeInput = 0;
+        }
+
+        paramsArr.push(date, phosInput, nitrateInput, phosDoseInput, nitrateDoseInput, waterChangeInput, potassiumDoseInput);
+
+        const response = await fetch("/waterParams", {
+                method: "PUT",
+                body: JSON.stringify(paramsArr),
+                headers: {
+                    "Content-Type": "application/json"
+                }
+            })
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`)
+            }
+    }
+
     let body = document.getElementsByTagName("body")[0];
     let sliderContainer = document.getElementById("sliderContainer");
     let colorSliderContainer = document.getElementById("colorSliders");
     let button = document.getElementById("addTime");
     let sendButton = document.getElementById("send");
+    let doseButton = document.getElementById("doseSend");
     let s = new schedule();
     sendButton.onclick = () => { if(!s.loading) s.sendColors() }
     button.onclick = () => { if(!s.loading) createPoint(0) };
+    doseButton.onclick = () => { if(!s.loading) sendDose() };
 
     window.addEventListener("resize", s.updateCanvas.bind(s), true);
 </script>

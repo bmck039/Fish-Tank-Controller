@@ -10,6 +10,7 @@ hostName = "localhost"
 port = 8080
 
 webServer = None
+sizeOfTank = 9 #gallons
 
 class Server(BaseHTTPRequestHandler):
   def do_GET(self):
@@ -24,7 +25,7 @@ class Server(BaseHTTPRequestHandler):
       self.end_headers()
       save = open("save.json").read()
       self.wfile.write(bytes(save, "utf-8"))
-    elif self.path == "train":
+    elif self.path == "/train":
       #run FiahTankAITrain.py and send results to user
       ai = FishTankAITrain.Train()
       ai.setup()
@@ -40,15 +41,16 @@ class Server(BaseHTTPRequestHandler):
     contentLen = int(self.headers['content-length'])
     byte = self.rfile.read(contentLen)
     string = ''.join(map(chr, byte))
-    if self.path == "waterParams":
+    if self.path == "/waterParams":
       #add data point to file
       saveFile = open("data.csv", "w")
-      saveFile.write(datetime.datetime.now().strftime("%m/%d/%Y") + ",")
-      values = json.loads(string)
-      for item in values:
-         saveFile.write(str(item) + ",")
       saveFile.write("\n")
+      values = json.loads(string)
+      doseValues = [values[0], values[1], values[2], values[3], values[4], values[5], sizeOfTank, values[5]]
+      for item in doseValues:
+         saveFile.write(str(item) + ",")
       saveFile.close()
+      print("added data point")
       subprocess.run(["git", "add", "data.csv"])
       subprocess.run(["git", "commit", "-m", "added data point for " + datetime.datetime.now().strftime("%m/%d/%Y")])
       subprocess.run(["git", "push"])
