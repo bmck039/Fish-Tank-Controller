@@ -46,7 +46,7 @@ class Server(BaseHTTPRequestHandler):
       saveFile = open("data.csv", "a")
       saveFile.write("\n")
       values = json.loads(string)
-      doseValues = [values[0], values[1], values[2], values[3], values[4], values[5], sizeOfTank, values[5]]
+      doseValues = [values[0], values[1], values[2], values[3], values[4], values[5], sizeOfTank, values[6]]
       for item in doseValues:
          saveFile.write(str(item) + ",")
       saveFile.close()
