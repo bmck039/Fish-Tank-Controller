@@ -20,6 +20,11 @@
         <div><span>Water Change (Gallons): </span><input type="number" id="waterChangeInput"></div>
     </div>
     <button id="doseSend">Send Test Values</button>
+    <button id="trainSend">Train</button>
+    <div id="predictionsContainer">
+        <div>Predicted Phosphate: <span id="phosDosePredicted"></span></div>
+        <div>Predicted Nitrate: <span id="nitrateDosePredicted"></span></div>
+    </div>
 </body>
 
 <script>
@@ -286,8 +291,13 @@
         index++;
     }
 
+    function convertDateToUTC(date) { 
+        return new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours(), date.getUTCMinutes(), date.getUTCSeconds()); 
+    }
+
     function formatDate(date) {
         if(!date) date = new Date();
+        date = convertDateToUTC(date);
         return date.getMonth() + 1 + "/" + date.getDate() + "/" + date.getFullYear();
     }
 
@@ -336,16 +346,37 @@
             }
     }
 
+    async function requestTrain() {
+        const response = await fetch("/train", {
+                method: "GET"
+            })
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`)
+            } 
+            let body = await response.text();
+            let array = JSON.parse(body);
+            let predictedPhos = array['phos'];
+            let predictedNitrate = array['nit'];
+
+            let phosDosePredicted = document.getElementById("phosDosePredicted");
+            let nitrateDosePredicted = document.getElementById("nitrateDosePredicted");
+            phosDosePredicted.innerText = predictedPhos;
+            nitrateDosePredicted.innerText = predictedNitrate;
+    }
+
     let body = document.getElementsByTagName("body")[0];
     let sliderContainer = document.getElementById("sliderContainer");
     let colorSliderContainer = document.getElementById("colorSliders");
     let button = document.getElementById("addTime");
     let sendButton = document.getElementById("send");
     let doseButton = document.getElementById("doseSend");
+    let trainButton = document.getElementById("trainSend");
     let s = new schedule();
     sendButton.onclick = () => { if(!s.loading) s.sendColors() }
     button.onclick = () => { if(!s.loading) createPoint(0) };
     doseButton.onclick = () => { if(!s.loading) sendDose() };
+    trainButton.onclick = () => { if(!s.loading) requestTrain() };
 
     window.addEventListener("resize", s.updateCanvas.bind(s), true);
 </script>
@@ -433,5 +464,23 @@
     #inputContainer {
         position: absolute;
         top: 500px;
+    }
+
+    #doseSend {
+        position: absolute;
+        top: 518px;
+        left: 320px;
+    }
+
+    #trainSend {
+        position: absolute;
+        top: 548px;
+        left: 320px;
+    }
+
+    #predictionsContainer {
+        position: absolute;
+        top: 580px;
+        left: 320px;
     }
 </style>
