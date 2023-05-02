@@ -4,8 +4,6 @@ import numpy as np
 from datetime import date
 import math
 
-print("Tensorflow version:", tf.__version__)
-
 class Train:
 
     values = None
@@ -81,10 +79,10 @@ class Train:
                 date_change = self.getDaySeparation(i, i + 1)
 
                 if(self.potDose.get(i) == 0):
-                    daysSincePotDose += date_change
+                    self.daysSincePotDose += date_change
                 else:
-                    daysSincePotDose = date_change
-                    potInitDose = self.potDose.get(i)
+                    self.daysSincePotDose = date_change
+                    self.potInitDose = self.potDose.get(i)
 
 
                 phosVals = self.evaluatePhos(i, 0, 0)
@@ -105,10 +103,10 @@ class Train:
                         init_nit_dose = nitVals[2] - end_nit_dose
 
                         if end_nit_dose == nitDoseToday and end_phos_dose == phosDoseToday:
-                            self.test_data.append(np.array([phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), potInitDose, daysSincePotDose, self.waterChange.get(i)]))
+                            self.test_data.append(np.array([phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potInitDose, self.daysSincePotDose, self.waterChange.get(i)]))
                             self.test_output.append(np.array([end_phos_dose, end_nit_dose]))
                         else:
-                            self.formatted_data.append(np.array([phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), potInitDose, daysSincePotDose, self.waterChange.get(i)]))
+                            self.formatted_data.append(np.array([phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potInitDose, self.daysSincePotDose, self.waterChange.get(i)]))
                             self.formatted_output.append(np.array([end_phos_dose, end_nit_dose]))
 
         self.formatted_data = np.array(self.formatted_data)
@@ -124,6 +122,7 @@ class Train:
         return math.floor(math.sqrt(x + 10) * 2/3)
 
     def createModel(self):
+        self.formatData()
         hidden_layer_size = self.getLayerSize(self.formatted_data.shape[1], self.formatted_output.shape[1])
         self.model = tf.keras.models.Sequential()
         self.model.add(tf.keras.layers.Dense(hidden_layer_size, input_shape=(self.formatted_data.shape[1],)))
@@ -131,7 +130,6 @@ class Train:
         self.model.add(tf.keras.layers.Dense(self.formatted_output.shape[1], activation=tf.nn.softplus))
         self.model.build((None, self.formatted_data.shape[1]))
         self.num_epochs = self.getNumEpochs(len(self.formatted_data))
-        self.formatData()
         #creates model
 
     def train(self):
@@ -165,14 +163,14 @@ class Train:
         current_size = self.tankSize[len(self.tankSize) - 1]
 
         if(self.potDose[len(self.potDose) - 1] == 0):
-            daysSincePotDose += current_date_change.days + 1
+            self.daysSincePotDose += current_date_change.days + 1
         else:
-            daysSincePotDose = 1
-            potInitDose = self.potDose[len(self.potDose) - 1]
+            self.daysSincePotDose = 1
+            self.potInitDose = self.potDose[len(self.potDose) - 1]
 
         currentWaterChange = self.waterChange.get(len(self.waterChange) - 1)
 
-        predict_data = np.array([currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, potInitDose, daysSincePotDose, currentWaterChange])
+        predict_data = np.array([currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potInitDose, self.daysSincePotDose, currentWaterChange])
         predict_data = np.array([predict_data])
 
         prediction = self.model.predict(predict_data)[0]
@@ -185,7 +183,7 @@ class Train:
         print("Phosphate Dose: " + str(predicted_phos) + " mL")
         print("Nitrate Dose: " + str(predicted_nit) + " mL")
 
-        return (predicted_phos, predicted_nit)
+        return { "phos": str(predicted_phos), "nit": str(predicted_nit) }
 
     def setup(self):
         self.createModel()
