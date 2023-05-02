@@ -12,6 +12,22 @@ port = 8080
 webServer = None
 sizeOfTank = 9 #gallons
 
+def addLine(date, line):
+   append = True
+   file = open("data.csv", "r")
+   lines = file.readlines()
+   for i in range(len(lines)):
+      if lines[i].split(",")[0] == date:
+         append = False
+         lines[i] = line
+   if append:
+      lines.append(line)
+   file.close()
+   file = open("data.csv", "w")
+   for l in lines:
+      file.write(l)
+   file.close()
+
 class Server(BaseHTTPRequestHandler):
   def do_GET(self):
     self.send_response(200)
@@ -47,10 +63,13 @@ class Server(BaseHTTPRequestHandler):
       saveFile.write("\n")
       values = json.loads(string)
       doseValues = [values[0], values[1], values[2], values[3], values[4], values[5], sizeOfTank, values[6]]
-      for item in doseValues:
-         saveFile.write(str(item) + ",")
+      stringVals = ""
+      for i in range(len(doseValues)):
+         stringVals += str(doseValues[i])
+         if i != len(doseValues) - 1:
+            stringVals += ","
       saveFile.close()
-      print("added data point")
+      addLine(values[0], stringVals)
       subprocess.run(["git", "add", "data.csv"])
       subprocess.run(["git", "commit", "-m", "added data point for " + datetime.datetime.now().strftime("%m/%d/%Y")])
       subprocess.run(["git", "push"])
