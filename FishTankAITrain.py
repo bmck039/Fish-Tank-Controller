@@ -141,6 +141,7 @@ class Train:
 
         self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True)
 
+    def save(self):
         self.model.save("test")
 
     def predict(self):
