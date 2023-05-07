@@ -24,6 +24,7 @@
     <div id="predictionsContainer">
         <div>Predicted Phosphate: <span id="phosDosePredicted"></span></div>
         <div>Predicted Nitrate: <span id="nitrateDosePredicted"></span></div>
+        <button id="addDoses">Add Doses</button>
     </div>
 </body>
 
@@ -32,6 +33,7 @@
     let index = 0;
     let graphElement = document.getElementById("graph");
     let canvas = graphElement.getContext("2d");
+    let training = false;
 
     function pointClicked(i) {
         for(let j = 0; j < colorSliderContainer.children.length; j++) {
@@ -297,7 +299,8 @@
 
     function formatDate(date) {
         if(!date) date = new Date();
-        date = convertDateToUTC(date);
+        else date = convertDateToUTC(date);
+        console.log(date);
         return date.getMonth() + 1 + "/" + date.getDate() + "/" + date.getFullYear();
     }
 
@@ -346,7 +349,37 @@
             }
     }
 
+    function addDoses() {
+        let phosDosePredicted = document.getElementById("phosDosePredicted").innerText;
+        let nitrateDosePredicted = document.getElementById("nitrateDosePredicted").innerText;
+
+        let phosDoseInput = document.getElementById("phosDoseInput");
+        let nitrateDoseInput = document.getElementById("nitDoseInput");
+
+        phosDoseInput.valueAsNumber += parseFloat(phosDosePredicted);
+        nitrateDoseInput.valueAsNumber += parseFloat(nitrateDosePredicted);
+
+        sendDose();
+    }
+
+    async function refreshAI() {
+        if(training) {
+            const response = await fetch("/status", {
+                method: "GET"
+            })
+
+            if (!response.ok) {
+                throw new Error(`Request failed with status ${response.status}`)
+            }
+            let body = await response.text();
+            body = JSON.parse(body);
+            let status = body['progress'];
+        }
+        setTimeout(refreshAI, 3000);
+    }
+
     async function requestTrain() {
+        training = true;
         const response = await fetch("/train", {
                 method: "GET"
             })
@@ -363,6 +396,7 @@
             let nitrateDosePredicted = document.getElementById("nitrateDosePredicted");
             phosDosePredicted.innerText = predictedPhos;
             nitrateDosePredicted.innerText = predictedNitrate;
+            training = false;
     }
 
     let body = document.getElementsByTagName("body")[0];
@@ -372,18 +406,20 @@
     let sendButton = document.getElementById("send");
     let doseButton = document.getElementById("doseSend");
     let trainButton = document.getElementById("trainSend");
+    let addDosesButton = document.getElementById("addDoses");
     let s = new schedule();
     sendButton.onclick = () => { if(!s.loading) s.sendColors() }
     button.onclick = () => { if(!s.loading) createPoint(0) };
     doseButton.onclick = () => { if(!s.loading) sendDose() };
     trainButton.onclick = () => { if(!s.loading) requestTrain() };
+    addDosesButton.onclick = () => { if(!s.loading) addDoses() };
 
     window.addEventListener("resize", s.updateCanvas.bind(s), true);
 </script>
 
 <style>
     #graph {
-        position: fixed;
+        position: absolute;
         top: 30px;
         left: 10%;
         background-color: #515151;
@@ -482,5 +518,9 @@
         position: absolute;
         top: 580px;
         left: 320px;
+    }
+
+    #addDoses {
+        margin-top: 5px;
     }
 </style>
