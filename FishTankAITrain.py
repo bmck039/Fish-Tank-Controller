@@ -1,10 +1,11 @@
 import tensorflow as tf
+import keras
 import pandas as pd
 import numpy as np
 from datetime import date
 import math
 
-class Callbacks(tf.keras.callbacks.Callback):
+class Callbacks(keras.callbacks.Callback):
 
     def __init__(self, callback, numEpochs):
         self.callback = callback
@@ -138,10 +139,10 @@ class Train:
     def createModel(self):
         self.formatData()
         hidden_layer_size = self.getLayerSize(self.formatted_data.shape[1], self.formatted_output.shape[1])
-        self.model = tf.keras.models.Sequential()
-        self.model.add(tf.keras.layers.Dense(hidden_layer_size, input_shape=(self.formatted_data.shape[1],)))
-        self.model.add(tf.keras.layers.Dense(hidden_layer_size))
-        self.model.add(tf.keras.layers.Dense(self.formatted_output.shape[1], activation=tf.nn.softplus))
+        self.model = keras.models.Sequential()
+        self.model.add(keras.layers.Dense(hidden_layer_size, input_shape=(self.formatted_data.shape[1],)))
+        self.model.add(keras.layers.Dense(hidden_layer_size))
+        self.model.add(keras.layers.Dense(self.formatted_output.shape[1], activation=tf.nn.softplus))
         self.model.build((None, self.formatted_data.shape[1]))
         self.num_epochs = self.getNumEpochs(len(self.formatted_data))
         #creates model
@@ -153,11 +154,11 @@ class Train:
         return { "progress": self.progress }
 
     def train(self):
-        self.model.compile(loss = tf.keras.losses.MeanSquaredError(), optimizer = tf.keras.optimizers.Adam())
+        self.model.compile(loss = keras.losses.MeanSquaredError(), optimizer = keras.optimizers.Adam())
 
         print("Training on " + str(len(self.formatted_data)) + " data points for " + str(self.num_epochs) + " epochs with " + str(self.getPatience(self.num_epochs / 2)) + " patience")
 
-        earlyStop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience = self.getPatience(self.num_epochs / 2), restore_best_weights = True, start_from_epoch = self.num_epochs / 2)
+        # earlyStop = keras.callbacks.EarlyStopping(monitor="val_loss", patience = self.getPatience(self.num_epochs / 2), restore_best_weights = True, start_from_epoch = self.num_epochs / 2)
 
         self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True, callbacks=[Callbacks(self.setProgress, self.num_epochs)])
 
