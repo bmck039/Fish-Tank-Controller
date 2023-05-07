@@ -7,7 +7,9 @@ import BLE
 import FishTankAITrain
 
 hostName = "localhost"
-port = 8080
+port = 80
+
+#netsh interface portproxy add v4tov4 listenport=80 listenaddress=[ip] connectport=80 connectaddress=fishtank.local
 
 webServer = None
 sizeOfTank = 9 #gallons
@@ -21,6 +23,7 @@ def addLine(date, line):
          append = False
          lines[i] = line
    if append:
+      lines[i] += "\n"
       lines.append(line)
    file.close()
    file = open("data.csv", "w")
@@ -30,26 +33,40 @@ def addLine(date, line):
 
 class Server(BaseHTTPRequestHandler):
   def do_GET(self):
-    self.send_response(200)
     if self.path == "/":
       file = open("main.html", "r").read()
+      self.send_response(200)
       self.send_header("Content-type", "text/html")
       self.end_headers()
       self.wfile.write(bytes(file, "utf-8"))
     elif self.path == "/save":
+      self.send_response(200)
       self.send_header("Content-type", "application/json")
       self.end_headers()
       save = open("save.json").read()
       self.wfile.write(bytes(save, "utf-8"))
     elif self.path == "/train":
+      self.send_response(200)
       #run FiahTankAITrain.py and send results to user
-      ai = FishTankAITrain.Train()
-      ai.setup()
-      results = ai.predict()
+      self.ai = FishTankAITrain.Train()
+      self.ai.setup()
+      results = self.ai.predict()
+      self.ai = None
       self.send_header("Content-type", "application/json")
       self.end_headers()
       results = json.dumps(results)
       self.wfile.write(bytes(results, "utf-8"))
+    elif self.path == "/status":
+       #run FiahTankAITrain.py and send results to user
+      if self.ai != None:
+         self.send_response(200)
+         self.send_header("Content-type", "application/json")
+         self.end_headers()
+         results = self.ai.getProgress()
+         results = json.dumps(results)
+         self.wfile.write(bytes(results, "utf-8"))
+      else:
+         self.send_response(403)
 
   def do_PUT(self):
     self.send_response(200)
@@ -60,7 +77,7 @@ class Server(BaseHTTPRequestHandler):
     if self.path == "/waterParams":
       #add data point to file
       saveFile = open("data.csv", "a")
-      saveFile.write("\n")
+      # saveFile.write("\n")
       values = json.loads(string)
       doseValues = [values[0], values[1], values[2], values[3], values[4], values[5], sizeOfTank, values[6]]
       stringVals = ""
@@ -69,9 +86,10 @@ class Server(BaseHTTPRequestHandler):
          if i != len(doseValues) - 1:
             stringVals += ","
       saveFile.close()
+      print(stringVals)
       addLine(values[0], stringVals)
       subprocess.run(["git", "add", "data.csv"])
-      subprocess.run(["git", "commit", "-m", "added data point for " + datetime.datetime.now().strftime("%m/%d/%Y")])
+      subprocess.run(["git", "commit", "-m", "added data point for " + values[0]])
       subprocess.run(["git", "push"])
     else:
       timeObjects = json.loads(string)
