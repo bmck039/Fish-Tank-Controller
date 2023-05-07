@@ -4,6 +4,20 @@ import numpy as np
 from datetime import date
 import math
 
+class Callbacks(tf.keras.callbacks.Callback):
+
+    def __init__(self, callback, numEpochs):
+        self.callback = callback
+        self.numEpochs = numEpochs
+        super(Callbacks, self).__init__()
+
+    def on_epoch_end(self, epoch, logs={}):
+        self.updateProgress(self.callback, epoch, self.numEpochs)
+
+    def updateProgress(self, callback, epoch, numEpochs):
+        progress = str(epoch) + "/" + str(numEpochs) + " " + str(int(100 * epoch / numEpochs)) + "%"
+        callback(progress)
+
 class Train:
 
     values = None
@@ -132,6 +146,12 @@ class Train:
         self.num_epochs = self.getNumEpochs(len(self.formatted_data))
         #creates model
 
+    def setProgress(self, progress):
+        self.progress = progress
+
+    def getProgress(self):
+        return { "progress": self.progress }
+
     def train(self):
         self.model.compile(loss = tf.keras.losses.MeanSquaredError(), optimizer = tf.keras.optimizers.Adam())
 
@@ -139,7 +159,7 @@ class Train:
 
         earlyStop = tf.keras.callbacks.EarlyStopping(monitor="val_loss", patience = self.getPatience(self.num_epochs / 2), restore_best_weights = True, start_from_epoch = self.num_epochs / 2)
 
-        self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True)
+        self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True, callbacks=[Callbacks(self.setProgress, self.num_epochs)])
 
     def save(self):
         self.model.save("test")
