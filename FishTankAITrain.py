@@ -1,3 +1,4 @@
+import threading
 import tensorflow as tf
 import keras
 import pandas as pd
@@ -16,8 +17,7 @@ class Callbacks(keras.callbacks.Callback):
         self.updateProgress(self.callback, epoch, self.numEpochs)
 
     def updateProgress(self, callback, epoch, numEpochs):
-        progress = str(epoch) + "/" + str(numEpochs) + " " + str(int(100 * epoch / numEpochs)) + "%"
-        callback(progress)
+        callback(epoch, numEpochs)
 
 class Train:
 
@@ -65,6 +65,14 @@ class Train:
 
         self.daysSincePotDose = 0
         self.potInitDose = self.potDose.get(0)
+        self.training = False
+        self.trained = False
+
+        self.progress = ""
+        self.percent = 0
+
+    def isTrained(self):
+        return self.trained
 
     def getNumEpochs(self, numDataPoints):
         return int( (numDataPoints + 4000) / (1 + math.exp((numDataPoints - 1000) / 900)) + 200)
@@ -145,15 +153,18 @@ class Train:
         self.model.add(keras.layers.Dense(self.formatted_output.shape[1], activation=tf.nn.softplus))
         self.model.build((None, self.formatted_data.shape[1]))
         self.num_epochs = self.getNumEpochs(len(self.formatted_data))
+        self.trained = False
         #creates model
 
-    def setProgress(self, progress):
-        self.progress = progress
+    def setProgress(self, epoch, numEpochs):
+        self.progress = str(epoch) + "/" + str(numEpochs) + " " + str(int(100 * epoch / numEpochs)) + "%"
+        self.percent = epoch / numEpochs * 100
 
     def getProgress(self):
-        return { "progress": self.progress }
+        return { "progress": self.progress, "percent": self.percent }
 
     def train(self):
+        self.training = True
         self.model.compile(loss = keras.losses.MeanSquaredError(), optimizer = keras.optimizers.Adam())
 
         print("Training on " + str(len(self.formatted_data)) + " data points for " + str(self.num_epochs) + " epochs with " + str(self.getPatience(self.num_epochs / 2)) + " patience")
@@ -161,6 +172,9 @@ class Train:
         # earlyStop = keras.callbacks.EarlyStopping(monitor="val_loss", patience = self.getPatience(self.num_epochs / 2), restore_best_weights = True, start_from_epoch = self.num_epochs / 2)
 
         self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True, callbacks=[Callbacks(self.setProgress, self.num_epochs)])
+        self.training = False
+        self.trained = True
+        
 
     def save(self):
         self.model.save("test")
@@ -209,7 +223,8 @@ class Train:
 
     def setup(self):
         self.createModel()
-        self.train()
+        thread = threading.Thread(daemon = True, target=self.train)
+        thread.start()
 # tank.doseP(predicted_phos)
 # tank.doseN(predicted_nit)
 # tank.changeWater(predicted_water_change)

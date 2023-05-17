@@ -22,6 +22,10 @@
     <button id="doseSend">Send Values</button>
     <button id="trainSend">Train</button>
     <div id="predictionsContainer">
+        <div id="progressContainer">
+            <label for="progress">Training Progress:</label>
+            <progress id="progress" value="0" max="100"></progress> 
+        </div>
         <div>Predicted Phosphate: <span id="phosDosePredicted"></span></div>
         <div>Predicted Nitrate: <span id="nitrateDosePredicted"></span></div>
         <button id="addDoses">Add Doses</button>
@@ -34,6 +38,7 @@
     let graphElement = document.getElementById("graph");
     let canvas = graphElement.getContext("2d");
     let training = false;
+    let timeoutTime = 1000;
 
     function pointClicked(i) {
         for(let j = 0; j < colorSliderContainer.children.length; j++) {
@@ -337,16 +342,17 @@
         paramsArr.push(date, phosInput, nitrateInput, phosDoseInput, nitrateDoseInput, waterChangeInput, potassiumDoseInput);
 
         const response = await fetch("/waterParams", {
-                method: "PUT",
-                body: JSON.stringify(paramsArr),
-                headers: {
-                    "Content-Type": "application/json"
-                }
-            })
-
-            if (!response.ok) {
-                throw new Error(`Request failed with status ${response.status}`)
+            method: "PUT",
+            body: JSON.stringify(paramsArr),
+            headers: {
+                "Content-Type": "application/json"
             }
+        })
+
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`)
+        }
+        
     }
 
     function addDoses() {
@@ -368,35 +374,54 @@
                 method: "GET"
             })
 
-            if (!response.ok) {
+            if (!response.ok && response.status != 204) {
                 throw new Error(`Request failed with status ${response.status}`)
+            } else if(response.status == 204) {
+                setTimeout(refreshAI, timeoutTime);
+                return;
             }
             let body = await response.text();
             body = JSON.parse(body);
             let status = body['progress'];
+            let percent = body['percent'];
+
+            let progress = document.getElementById("progress");
+            progress.value = percent;
+            progress.innerText = status;
+
+            let trained = body['trained'];
+            if(trained) {
+                let predictions = body['predictions'];
+                let predictedPhos = predictions['phos'];
+                let predictedNitrate = predictions['nit'];
+
+                let phosDosePredicted = document.getElementById("phosDosePredicted");
+                let nitrateDosePredicted = document.getElementById("nitrateDosePredicted");
+                phosDosePredicted.innerText = predictedPhos;
+                nitrateDosePredicted.innerText = predictedNitrate;
+                training = false;
+            }
+            setTimeout(refreshAI, timeoutTime);
         }
-        setTimeout(refreshAI, 3000);
     }
 
     async function requestTrain() {
         training = true;
+        let progressContainer = document.getElementById("progressContainer");
+        let progress = document.getElementById("progress");
+        
+        progress.value = 0;
+        progressContainer.style.display = "block";
         const response = await fetch("/train", {
-                method: "GET"
-            })
+            method: "PUT"
+        })
 
-            if (!response.ok) {
-                throw new Error(`Request failed with status ${response.status}`)
-            } 
-            let body = await response.text();
-            let array = JSON.parse(body);
-            let predictedPhos = array['phos'];
-            let predictedNitrate = array['nit'];
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`)
+        }
 
-            let phosDosePredicted = document.getElementById("phosDosePredicted");
-            let nitrateDosePredicted = document.getElementById("nitrateDosePredicted");
-            phosDosePredicted.innerText = predictedPhos;
-            nitrateDosePredicted.innerText = predictedNitrate;
-            training = false;
+        refreshAI();
+
     }
 
     let body = document.getElementsByTagName("body")[0];
@@ -522,5 +547,12 @@
 
     #addDoses {
         margin-top: 5px;
+    }
+
+    #progressContainer {
+        position: absolute;
+        top: -35px;
+        left: 50px;
+        display: none;
     }
 </style>

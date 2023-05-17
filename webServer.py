@@ -3,11 +3,14 @@ import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
 import subprocess
+import threading
 import BLE
 import FishTankAITrain
 
 hostName = "localhost"
 port = 80
+
+ai = None
 
 #netsh interface portproxy add v4tov4 listenport=80 listenaddress=[ip] connectport=80 connectaddress=fishtank.local
 
@@ -32,7 +35,14 @@ def addLine(date, line):
    file.close()
 
 class Server(BaseHTTPRequestHandler):
+
+
+  def train(self):
+      global ai
+      ai.setup()
+
   def do_GET(self):
+    global ai
     if self.path == "/":
       file = open("main.html", "r").read()
       self.send_response(200)
@@ -45,30 +55,24 @@ class Server(BaseHTTPRequestHandler):
       self.end_headers()
       save = open("save.json").read()
       self.wfile.write(bytes(save, "utf-8"))
-    elif self.path == "/train":
-      self.send_response(200)
-      #run FiahTankAITrain.py and send results to user
-      self.ai = FishTankAITrain.Train()
-      self.ai.setup()
-      results = self.ai.predict()
-      self.ai = None
-      self.send_header("Content-type", "application/json")
-      self.end_headers()
-      results = json.dumps(results)
-      self.wfile.write(bytes(results, "utf-8"))
     elif self.path == "/status":
        #run FiahTankAITrain.py and send results to user
-      if self.ai != None:
+      if ai != None:
          self.send_response(200)
          self.send_header("Content-type", "application/json")
          self.end_headers()
-         results = self.ai.getProgress()
+         results = ai.getProgress()
+         results['trained'] = ai.isTrained()
+         if ai.isTrained():
+            results["predictions"] = ai.predict()
          results = json.dumps(results)
          self.wfile.write(bytes(results, "utf-8"))
       else:
-         self.send_response(403)
+         self.send_response(204)
+         self.end_headers()
 
   def do_PUT(self):
+    global ai
     self.send_response(200)
     self.end_headers()
     contentLen = int(self.headers['content-length'])
@@ -91,6 +95,11 @@ class Server(BaseHTTPRequestHandler):
       subprocess.run(["git", "add", "data.csv"])
       subprocess.run(["git", "commit", "-m", "added data point for " + values[0]])
       subprocess.run(["git", "push"])
+    elif self.path == "/train":
+      #run FiahTankAITrain.py and send results to user
+      ai = FishTankAITrain.Train()
+      thread = threading.Thread(daemon = True, target=self.train)
+      thread.start()
     else:
       timeObjects = json.loads(string)
       save = open("save.json", "w")
