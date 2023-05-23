@@ -6,7 +6,7 @@ import subprocess
 import BLE
 import FishTankAITrain
 
-hostName = "localhost"
+hostName = "0.0.0.0"
 port = 80
 
 #netsh interface portproxy add v4tov4 listenport=80 listenaddress=[ip] connectport=80 connectaddress=fishtank.local
