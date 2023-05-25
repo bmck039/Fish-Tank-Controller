@@ -7,7 +7,7 @@ import threading
 import BLE
 import FishTankAITrain
 
-hostName = "localhost"
+hostName = "0.0.0.0"
 port = 80
 
 ai = None

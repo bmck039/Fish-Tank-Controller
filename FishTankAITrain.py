@@ -6,6 +6,8 @@ import numpy as np
 from datetime import date
 import math
 
+print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
 class Callbacks(keras.callbacks.Callback):
 
     def __init__(self, callback, numEpochs):
