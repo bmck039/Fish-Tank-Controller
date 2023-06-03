@@ -125,18 +125,12 @@ class Server(BaseHTTPRequestHandler):
       save.close()
       asyncio.run(BLE.sendSchedule(timeObjects)) # send to light over BLE
 
-def startServer():
-    webServer = HTTPServer((hostName, port), Server)
-    print("Server started http://%s:%s" % (hostName, port))
+webServer = HTTPServer((hostName, port), Server)
+print("Server started http://%s:%s" % (hostName, port))
 
-    try:
-        webServer.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    
-    webServer.server_close()
+try:
+   webServer.serve_forever()
+except KeyboardInterrupt:
+   pass
 
-def stopServer():
-   if webServer:
-        webServer.server_close()
-        webServer = None
+webServer.server_close()
