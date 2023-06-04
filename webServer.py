@@ -1,6 +1,8 @@
 import asyncio
 import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from zeroconf import IPVersion, ServiceInfo, Zeroconf
+import socket
 import json
 import subprocess
 import threading
@@ -12,7 +14,23 @@ port = 80
 
 ai = None
 
+name = socket.gethostname()
+ip_address = socket.gethostbyname(name)
+
 #netsh interface portproxy add v4tov4 listenport=80 listenaddress=[ip] connectport=80 connectaddress=fishtank.local
+
+ip_version = IPVersion.V4Only
+info = ServiceInfo(
+      "_http._tcp.local.",
+      "FishTankAI._http._tcp.local.",
+      addresses=[socket.inet_aton(ip_address)],
+      port=80,
+      properties={},
+      server="fishtank.local.",
+)
+
+zeroconf = Zeroconf(ip_version=ip_version)
+zeroconf.register_service(info)
 
 webServer = None
 sizeOfTank = 9 #gallons
@@ -113,18 +131,12 @@ class Server(BaseHTTPRequestHandler):
       save.close()
       asyncio.run(BLE.sendSchedule(timeObjects)) # send to light over BLE
 
-def startServer():
-    webServer = HTTPServer((hostName, port), Server)
-    print("Server started http://%s:%s" % (hostName, port))
+webServer = HTTPServer((hostName, port), Server)
+print("Server started http://%s:%s" % (hostName, port))
 
-    try:
-        webServer.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    
-    webServer.server_close()
+try:
+   webServer.serve_forever()
+except KeyboardInterrupt:
+   pass
 
-def stopServer():
-   if webServer:
-        webServer.server_close()
-        webServer = None
+webServer.server_close()
