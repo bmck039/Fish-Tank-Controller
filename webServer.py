@@ -36,13 +36,13 @@ def addLine(date, line):
 
 class Server(BaseHTTPRequestHandler):
 
-
   def train(self):
       global ai
       ai.setup()
 
   def do_GET(self):
     global ai
+    global currentDate
     if self.path == "/":
       file = open("main.html", "r").read()
       self.send_response(200)
@@ -70,6 +70,12 @@ class Server(BaseHTTPRequestHandler):
       else:
          self.send_response(204)
          self.end_headers()
+    elif self.path == "/waterParams":
+       self.send_response(200)
+       self.send_header("Content-type", "application/json")
+       self.end_headers()
+       values = FishTankAITrain.getValuesFromDate(currentDate)
+       self.wfile.write(bytes(json.dumps(values), "utf-8"))
 
   def do_PUT(self):
     global ai

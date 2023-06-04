@@ -425,6 +425,14 @@
 
     }
 
+    async function getValues() {
+        let date = document.getElementById("dateInput").valueAsDate;
+        date = formatDate(date);
+        const response = await fetch("/waterParams?date=" + date, {
+            method: "GET"
+        })
+    }
+
     let body = document.getElementsByTagName("body")[0];
     let sliderContainer = document.getElementById("sliderContainer");
     let colorSliderContainer = document.getElementById("colorSliders");
@@ -433,12 +441,14 @@
     let doseButton = document.getElementById("doseSend");
     let trainButton = document.getElementById("trainSend");
     let addDosesButton = document.getElementById("addDoses");
+    let dateInput = document.getElementById("dateInput");
     let s = new schedule();
     sendButton.onclick = () => { if(!s.loading) s.sendColors() }
     button.onclick = () => { if(!s.loading) createPoint(0) };
     doseButton.onclick = () => { if(!s.loading) sendDose() };
     trainButton.onclick = () => { if(!s.loading) requestTrain() };
     addDosesButton.onclick = () => { if(!s.loading) addDoses() };
+    dateInput.oninput = () => { if(!s.loading) getValues() };
 
     window.addEventListener("resize", s.updateCanvas.bind(s), true);
 </script>

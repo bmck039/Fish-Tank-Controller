@@ -8,6 +8,13 @@ import math
 
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
+def getValuesFromDate(date):
+    values = pd.read_csv("data.csv", names=["Day", "Phos", "N", "Phos Dose", "N Dose", "Water Change", "Tank Size", "Potassium"])
+    index = values['Day'].tolist().index(date)
+    if index == -1:
+        return [0 for i in range(values.shape[0] - 1)]
+    return values.loc[index].tolist()
+
 class Callbacks(keras.callbacks.Callback):
 
     def __init__(self, callback, numEpochs):
@@ -49,8 +56,9 @@ class Train:
         self.values = pd.read_csv("data.csv", names=["Day", "Phos", "N", "Phos Dose", "N Dose", "Water Change", "Tank Size", "Potassium"])
         self.num_epochs = 300
         self.increment = 0.1
-        self.dates = self.values.get("Day")
+        self.numDaysIncluded = 7
 
+        self.dates = self.values.get("Day")
         self.phos = self.values.get("Phos")
         self.nit = self.values.get("N")
         self.phosDose = self.values.get("Phos Dose")
@@ -99,22 +107,17 @@ class Train:
         return (self.nit.get(i), days, dose + self.nitDose.get(i))
 
     def formatData(self):
-        for i in range(self.values.shape[0] - 1):
+        for i in range(self.numDaysIncluded, self.values.shape[0] - 1):
             if(self.phos.get(i + 1) >= 0 and self.nit.get(i + 1) >= 0):
                 date_change = self.getDaySeparation(i, i + 1)
-
-                if(self.potDose.get(i) == 0):
-                    self.daysSincePotDose += date_change
-                else:
-                    self.daysSincePotDose = date_change
-                    self.potInitDose = self.potDose.get(i)
-
 
                 phosVals = self.evaluatePhos(i, 0, 0)
                 nitVals = self.evaluateNit(i, 0, 0)
 
                 phosDoseToday = self.phosDose.get(i)
                 nitDoseToday = self.nitDose.get(i)
+
+                dateVals = [self.evaluatePhos(i - j, 0, 0) + self.evaluateNit(i - j, 0, 0) + (self.potDose(i - j), self.getDaySeparation(i - j, i)) + self.waterChange(i - j) for j in range(self.numDaysIncluded, 0, -1)]
 
                 phos_arr = [n * self.increment for n in range(0, int(phosDoseToday / self.increment) + 1)]
                 nit_arr = [n * self.increment for n in range(0, int(nitDoseToday / self.increment) + 1)]
@@ -128,10 +131,10 @@ class Train:
                         init_nit_dose = nitVals[2] - end_nit_dose
 
                         if end_nit_dose == nitDoseToday and end_phos_dose == phosDoseToday:
-                            self.test_data.append(np.array([phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potInitDose, self.daysSincePotDose, self.waterChange.get(i)]))
+                            self.test_data.append(np.array(dateVals + [phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potDose.get(i), date_change, self.waterChange.get(i)]))
                             self.test_output.append(np.array([end_phos_dose, end_nit_dose]))
                         else:
-                            self.formatted_data.append(np.array([phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potInitDose, self.daysSincePotDose, self.waterChange.get(i)]))
+                            self.formatted_data.append(np.array(dateVals + [phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potDose.get(i), date_change, self.waterChange.get(i)]))
                             self.formatted_output.append(np.array([end_phos_dose, end_nit_dose]))
 
         self.formatted_data = np.array(self.formatted_data)
@@ -182,6 +185,9 @@ class Train:
         self.model.save("test")
 
     def predict(self):
+        i = len(self.phos) - 1
+
+        dateVals = [self.evaluatePhos(i - j, 0, 0) + self.evaluateNit(i - j, 0, 0) + (self.potDose(i - j), self.getDaySeparation(i - j, i)) + self.waterChange(i - j) for j in range(self.numDaysIncluded, 0, -1)]
         currentPhosVals = self.evaluatePhos(len(self.phos) - 1, 0, 0)
         currentNitVals = self.evaluateNit(len(self.nit) - 1, 0, 0)
 
@@ -208,7 +214,7 @@ class Train:
 
         currentWaterChange = self.waterChange.get(len(self.waterChange) - 1)
 
-        predict_data = np.array([currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potInitDose, self.daysSincePotDose, currentWaterChange])
+        predict_data = np.array(dateVals + [currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potDose(i), current_date_change.days, currentWaterChange])
         predict_data = np.array([predict_data])
 
         prediction = self.model.predict(predict_data)[0]
