@@ -54,7 +54,7 @@ class Train:
 
     def __init__(self):
         self.values = pd.read_csv("data.csv", names=["Day", "Phos", "N", "Phos Dose", "N Dose", "Water Change", "Tank Size", "Potassium"])
-        self.num_epochs = 300
+        self.num_epochs = 10
         self.increment = 0.1
         self.numDaysIncluded = 7
 
@@ -117,7 +117,8 @@ class Train:
                 phosDoseToday = self.phosDose.get(i)
                 nitDoseToday = self.nitDose.get(i)
 
-                dateVals = [self.evaluatePhos(i - j, 0, 0) + self.evaluateNit(i - j, 0, 0) + (self.potDose(i - j), self.getDaySeparation(i - j, i)) + self.waterChange(i - j) for j in range(self.numDaysIncluded, 0, -1)]
+                dateVals = [list(self.evaluatePhos(i - j, 0, 0)) + list(self.evaluateNit(i - j, 0, 0)) + list((self.potDose.get(i - j), self.getDaySeparation(i - j, i))) + [self.waterChange.get(i - j)] for j in range(self.numDaysIncluded, 0, -1)]
+                dateVals = [j for sub in dateVals for j in sub]
 
                 phos_arr = [n * self.increment for n in range(0, int(phosDoseToday / self.increment) + 1)]
                 nit_arr = [n * self.increment for n in range(0, int(nitDoseToday / self.increment) + 1)]
@@ -131,10 +132,10 @@ class Train:
                         init_nit_dose = nitVals[2] - end_nit_dose
 
                         if end_nit_dose == nitDoseToday and end_phos_dose == phosDoseToday:
-                            self.test_data.append(np.array(dateVals + [phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potDose.get(i), date_change, self.waterChange.get(i)]))
+                            self.test_data.append(np.array(list(dateVals + [phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potDose.get(i), date_change, self.waterChange.get(i)])))
                             self.test_output.append(np.array([end_phos_dose, end_nit_dose]))
                         else:
-                            self.formatted_data.append(np.array(dateVals + [phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potDose.get(i), date_change, self.waterChange.get(i)]))
+                            self.formatted_data.append(np.array(list(dateVals + [phosVals[0], nitVals[0], self.phos.get(i + 1), self.nit.get(i + 1), init_phos_dose, init_nit_dose, date_change_phos, date_change_nit, self.tankSize.get(i), self.potDose.get(i), date_change, self.waterChange.get(i)])))
                             self.formatted_output.append(np.array([end_phos_dose, end_nit_dose]))
 
         self.formatted_data = np.array(self.formatted_data)
@@ -152,18 +153,19 @@ class Train:
     def createModel(self):
         self.formatData()
         hidden_layer_size = self.getLayerSize(self.formatted_data.shape[1], self.formatted_output.shape[1])
+        hidden_layer_size2 = self.getLayerSize(hidden_layer_size, self.formatted_output.shape[1])
         self.model = keras.models.Sequential()
         self.model.add(keras.layers.Dense(hidden_layer_size, input_shape=(self.formatted_data.shape[1],)))
-        self.model.add(keras.layers.Dense(hidden_layer_size))
+        self.model.add(keras.layers.Dense(hidden_layer_size2))
         self.model.add(keras.layers.Dense(self.formatted_output.shape[1], activation=tf.nn.softplus))
         self.model.build((None, self.formatted_data.shape[1]))
-        self.num_epochs = self.getNumEpochs(len(self.formatted_data))
+        # self.num_epochs = self.getNumEpochs(len(self.formatted_data))
         self.trained = False
         #creates model
 
     def setProgress(self, epoch, numEpochs):
-        self.progress = str(epoch) + "/" + str(numEpochs) + " " + str(int(100 * epoch / numEpochs)) + "%"
-        self.percent = epoch / numEpochs * 100
+        self.progress = str(epoch + 1) + "/" + str(numEpochs) + " " + str(int(100 * (epoch + 1)/ numEpochs)) + "%"
+        self.percent = (epoch + 1) / numEpochs * 100
 
     def getProgress(self):
         return { "progress": self.progress, "percent": self.percent }
@@ -187,7 +189,8 @@ class Train:
     def predict(self):
         i = len(self.phos) - 1
 
-        dateVals = [self.evaluatePhos(i - j, 0, 0) + self.evaluateNit(i - j, 0, 0) + (self.potDose(i - j), self.getDaySeparation(i - j, i)) + self.waterChange(i - j) for j in range(self.numDaysIncluded, 0, -1)]
+        dateVals = [list(self.evaluatePhos(i - j, 0, 0)) + list(self.evaluateNit(i - j, 0, 0)) + list((self.potDose.get(i - j), self.getDaySeparation(i - j, i))) + [self.waterChange.get(i - j)] for j in range(self.numDaysIncluded, 0, -1)]
+        dateVals = [j for sub in dateVals for j in sub]
         currentPhosVals = self.evaluatePhos(len(self.phos) - 1, 0, 0)
         currentNitVals = self.evaluateNit(len(self.nit) - 1, 0, 0)
 
@@ -214,7 +217,7 @@ class Train:
 
         currentWaterChange = self.waterChange.get(len(self.waterChange) - 1)
 
-        predict_data = np.array(dateVals + [currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potDose(i), current_date_change.days, currentWaterChange])
+        predict_data = np.array(dateVals + [currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potDose.get(i), current_date_change.days, currentWaterChange])
         predict_data = np.array([predict_data])
 
         prediction = self.model.predict(predict_data)[0]
