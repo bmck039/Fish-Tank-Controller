@@ -306,7 +306,6 @@
     function formatDate(date) {
         if(!date) date = new Date();
         else date = convertDateToUTC(date);
-        console.log(date);
         return date.getMonth() + 1 + "/" + date.getDate() + "/" + date.getFullYear();
     }
 
@@ -428,9 +427,39 @@
     async function getValues() {
         let date = document.getElementById("dateInput").valueAsDate;
         date = formatDate(date);
-        const response = await fetch("/waterParams?date=" + date, {
+        const response = await fetch("/waterParams?date=" + encodeURIComponent(date), {
             method: "GET"
-        })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Request failed with status ${response.status}`)
+        }
+        let params = await response.text();
+        params = JSON.parse(params);
+        let phosInput = document.getElementById("phosInput");
+        let nitrateInput = document.getElementById("nitInput");
+        let phosDoseInput = document.getElementById("phosDoseInput");
+        let nitrateDoseInput = document.getElementById("nitDoseInput");
+        let potassiumDoseInput = document.getElementById("potDose");
+        let waterChangeInput = document.getElementById("waterChangeInput");
+        let dateInput = document.getElementById("dateInput");
+
+        if(Object.keys(params).length == 0) {
+            phosInput.valueAsNumber = -1;
+            nitrateInput.valueAsNumber = -1;
+            phosDoseInput.valueAsNumber = 0;
+            nitrateDoseInput.valueAsNumber = 0;
+            waterChangeInput.valueAsNumber = 0;
+            potassiumDoseInput.valueAsNumber = 0;
+        } else {
+            dateInput.valueAsDate = new Date(params['Day']);
+            phosInput.valueAsNumber = params['Phos'];
+            nitrateInput.valueAsNumber = params['N'];
+            phosDoseInput.valueAsNumber = params['Phos Dose'];
+            nitrateDoseInput.valueAsNumber = params['N Dose'];
+            waterChangeInput.valueAsNumber = params['Water Change'];
+            potassiumDoseInput.valueAsNumber = params['Potassium'];
+        }
     }
 
     let body = document.getElementsByTagName("body")[0];

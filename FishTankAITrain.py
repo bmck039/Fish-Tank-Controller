@@ -10,10 +10,11 @@ print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 def getValuesFromDate(date):
     values = pd.read_csv("data.csv", names=["Day", "Phos", "N", "Phos Dose", "N Dose", "Water Change", "Tank Size", "Potassium"])
-    index = values['Day'].tolist().index(date)
-    if index == -1:
-        return [0 for i in range(values.shape[0] - 1)]
-    return values.loc[index].tolist()
+    try:
+        index = values['Day'].tolist().index(date)
+        return values.loc[index].to_dict()
+    except ValueError:
+        return {}
 
 class Callbacks(keras.callbacks.Callback):
 
@@ -80,6 +81,12 @@ class Train:
 
         self.progress = ""
         self.percent = 0
+
+        self.output = {}
+        self.numTrained = 0
+        self.numRepetitions = 5
+        self.history = None
+
 
     def isTrained(self):
         return self.trained
@@ -165,22 +172,22 @@ class Train:
 
     def setProgress(self, epoch, numEpochs):
         self.progress = str(epoch + 1) + "/" + str(numEpochs) + " " + str(int(100 * (epoch + 1)/ numEpochs)) + "%"
-        self.percent = (epoch + 1) / numEpochs * 100
+        self.percent = (self.numTrained * numEpochs + epoch + 1) / (self.numRepetitions * numEpochs) * 100
 
     def getProgress(self):
         return { "progress": self.progress, "percent": self.percent }
 
     def train(self):
         self.training = True
-        self.model.compile(loss = keras.losses.MeanSquaredError(), optimizer = keras.optimizers.Adam())
+        self.model.compile(loss = keras.losses.MeanSquaredError(), optimizer = keras.optimizers.Adam(), metrics=['accuracy'])
 
         print("Training on " + str(len(self.formatted_data)) + " data points for " + str(self.num_epochs) + " epochs with " + str(self.getPatience(self.num_epochs / 2)) + " patience")
 
-        # earlyStop = keras.callbacks.EarlyStopping(monitor="val_loss", patience = self.getPatience(self.num_epochs / 2), restore_best_weights = True, start_from_epoch = self.num_epochs / 2)
+        earlyStop = keras.callbacks.EarlyStopping(monitor="val_accuracy", patience = self.getPatience(self.num_epochs / 2), restore_best_weights = True, start_from_epoch = self.num_epochs / 2)
 
-        self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True, callbacks=[Callbacks(self.setProgress, self.num_epochs)])
+        self.history = self.model.fit(self.formatted_data, self.formatted_output, epochs=self.num_epochs, verbose=1, validation_data=(self.test_data, self.test_output), use_multiprocessing = True, callbacks=[Callbacks(self.setProgress, self.num_epochs), earlyStop])
         self.training = False
-        self.trained = True
+        # self.trained = True
         
 
     def save(self):
@@ -217,7 +224,7 @@ class Train:
 
         currentWaterChange = self.waterChange.get(len(self.waterChange) - 1)
 
-        predict_data = np.array(dateVals + [currentPhos, currentNit, 1.0, 30, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potDose.get(i), current_date_change.days, currentWaterChange])
+        predict_data = np.array(dateVals + [currentPhos, currentNit, 1.0, 20, current_phos_dose, current_nit_dose, current_date_change.days + phosDateChange + 1, current_date_change.days + nitDateChange + 1, current_size, self.potDose.get(i), current_date_change.days, currentWaterChange])
         predict_data = np.array([predict_data])
 
         prediction = self.model.predict(predict_data)[0]
@@ -234,8 +241,28 @@ class Train:
 
     def setup(self):
         self.createModel()
-        thread = threading.Thread(daemon = True, target=self.train)
+        thread = threading.Thread(daemon = True, target=self.multiTrain)
         thread.start()
+    
+    def avg(self, A, B):
+        return round(sum([x * y for x, y in zip(A, B)]) / sum(B), 1)
+
+    def multiTrain(self):
+        self.trained = False
+        self.numTrained = 0
+        outputs = {k: [] for k in ["phos", "nit"]}
+        accuracies = []
+        for i in range(self.numRepetitions):
+            self.train()
+            output = self.predict()
+            self.numTrained += 1
+            outputs = {k: outputs[k] + [float(output[k])] for k in outputs}
+            accuracies.append(self.history.history["accuracy"][-1])
+        self.output = {k: self.avg([v for v in outputs[k]], accuracies) for k in outputs}
+        self.trained = True
+    
+    def getOutput(self):
+        return self.output
 # tank.doseP(predicted_phos)
 # tank.doseN(predicted_nit)
 # tank.changeWater(predicted_water_change)

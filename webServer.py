@@ -2,6 +2,7 @@ import asyncio
 import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from zeroconf import IPVersion, ServiceInfo, Zeroconf
+from urllib.parse import urlparse, parse_qs
 import socket
 import json
 import subprocess
@@ -60,7 +61,9 @@ class Server(BaseHTTPRequestHandler):
 
   def do_GET(self):
     global ai
-    global currentDate
+    fullPath = self.path
+    self.path = urlparse(fullPath).path
+    self.queries = parse_qs(urlparse(fullPath).query)
     if self.path == "/":
       file = open("main.html", "r").read()
       self.send_response(200)
@@ -82,7 +85,7 @@ class Server(BaseHTTPRequestHandler):
          results = ai.getProgress()
          results['trained'] = ai.isTrained()
          if ai.isTrained():
-            results["predictions"] = ai.predict()
+            results["predictions"] = ai.getOutput()
          results = json.dumps(results)
          self.wfile.write(bytes(results, "utf-8"))
       else:
@@ -92,7 +95,9 @@ class Server(BaseHTTPRequestHandler):
        self.send_response(200)
        self.send_header("Content-type", "application/json")
        self.end_headers()
-       values = FishTankAITrain.getValuesFromDate(currentDate)
+       print(self.queries)
+       date = self.queries["date"][0]
+       values = FishTankAITrain.getValuesFromDate(date)
        self.wfile.write(bytes(json.dumps(values), "utf-8"))
 
   def do_PUT(self):
@@ -122,8 +127,10 @@ class Server(BaseHTTPRequestHandler):
     elif self.path == "/train":
       #run FiahTankAITrain.py and send results to user
       ai = FishTankAITrain.Train()
+      
       thread = threading.Thread(daemon = True, target=self.train)
       thread.start()
+
     else:
       timeObjects = json.loads(string)
       save = open("save.json", "w")
