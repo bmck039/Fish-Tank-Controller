@@ -6,6 +6,7 @@ import numpy as np
 from datetime import date
 import math
 
+print("Tensorflow Version: ", tf.__version__)
 print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
 def getValuesFromDate(date):
