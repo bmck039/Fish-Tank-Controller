@@ -37,6 +37,7 @@ webServer = None
 sizeOfTank = 9 #gallons
 
 def addLine(date, line):
+   line += "\n"
    append = True
    file = open("data.csv", "r")
    lines = file.readlines()
@@ -45,7 +46,6 @@ def addLine(date, line):
          append = False
          lines[i] = line
    if append:
-      lines[i] += "\n"
       lines.append(line)
    file.close()
    file = open("data.csv", "w")
@@ -119,7 +119,6 @@ class Server(BaseHTTPRequestHandler):
          if i != len(doseValues) - 1:
             stringVals += ","
       saveFile.close()
-      print(stringVals)
       addLine(values[0], stringVals)
       subprocess.run(["git", "add", "data.csv"])
       subprocess.run(["git", "commit", "-m", "added data point for " + values[0]])
